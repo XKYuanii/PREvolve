@@ -77,11 +77,22 @@ class JsonChatClientTests(unittest.TestCase):
             "https://example.test", "secret", "model", timeout=60,
         )
 
-        client.complete_json(
-            "lead", "system", "task", timeout_seconds=0.2,
-        )
+        with mock.patch("evoagent.llm.client.time.monotonic", return_value=10000.0):
+            client.complete_json(
+                "lead", "system", "task", timeout_seconds=0.2,
+            )
 
         self.assertLessEqual(urlopen.call_args.kwargs["timeout"], 0.2)
+
+    @mock.patch("evoagent.llm.client.urllib.request.urlopen")
+    def test_request_timeout_does_not_extend_a_nearly_exhausted_deadline(self, urlopen):
+        urlopen.return_value = FakeResponse('{"action":"final"}')
+        client = JsonChatClient("https://example.test", "secret", "model", timeout=60)
+
+        with mock.patch("evoagent.llm.client.time.monotonic", side_effect=[100, 100.195, 100.195]):
+            client.complete_json("lead", "system", "task", timeout_seconds=0.2)
+
+        self.assertAlmostEqual(urlopen.call_args.kwargs["timeout"], 0.005)
 
     @mock.patch("evoagent.llm.client.urllib.request.urlopen")
     def test_json_markdown_fence_is_removed_locally(self, urlopen):

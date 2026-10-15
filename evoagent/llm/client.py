@@ -82,10 +82,11 @@ class JsonChatClient:
         headers.update(self.extra_headers)
         max_attempts = 3
         structured_retry_used = False
-        deadline = (
-            time.monotonic() + max(0.01, float(timeout_seconds))
+        call_timeout = (
+            max(0.01, float(timeout_seconds))
             if timeout_seconds is not None else None
         )
+        deadline = time.monotonic() + call_timeout if call_timeout is not None else None
         for attempt in range(max_attempts):
             remaining = deadline - time.monotonic() if deadline is not None else None
             if remaining is not None and remaining <= 0:
@@ -101,7 +102,7 @@ class JsonChatClient:
             try:
                 request_timeout = self.timeout
                 if remaining is not None:
-                    request_timeout = max(0.01, min(float(self.timeout), remaining))
+                    request_timeout = min(float(self.timeout), call_timeout, remaining)
                 if ledger:
                     ledger.trace(
                         role, "request_attempt", request_attempt=attempt + 1,
